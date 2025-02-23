@@ -1,0 +1,115 @@
+/*******************************************
+ * Define Constants and assign Pins        *
+ *******************************************/
+#define TMPSENSOR A0
+#define LED 11
+#define PB 12
+#define RELAY 10
+#define REDLED 9
+#define GREENLED 7
+#define BLUELED 8
+#define SWITCH 6
+
+float sensor;
+float voltage;
+float temperatureC;
+float Threshold = 28; //Threshold intensity (degree C)
+unsigned long timer = 0; // initial timer value
+
+/**************OWN MADE FUNCTIONS**************/
+void GREEN(void); //GREEN LED = ON
+void RED(void);   //RED LED = ON
+void BLUE(void);  //BLUE LED = ON
+
+/************* Main Functions**************/
+void setup() {
+  Serial.begin(9600);
+  pinMode(TMPSENSOR, INPUT); // Set SENSOR as INPUT
+  pinMode(LED, OUTPUT);       // Set LED as OUTPUT
+  pinMode(PB, INPUT);         // Set PB as INPUT
+  pinMode(RELAY, OUTPUT);     // Set RELAY as OUTPUT
+  pinMode(SWITCH, INPUT);     // Set SWITCH as INPUT
+  pinMode(REDLED, OUTPUT);    // Set RED LED as OUTPUT
+  pinMode(GREENLED, OUTPUT);  // Set GREEN LED as OUTPUT
+  pinMode(BLUELED, OUTPUT);   // Set BLUE LED as OUTPUT
+
+  /* Initialise RELAY pin HIGH; relay not energised. So that the relay would not
+     start working when I just started the simulation */
+  //So that led would not be on as a default
+  digitalWrite(RELAY, HIGH);
+  digitalWrite(LED, HIGH);
+}
+
+void loop() {
+  if (millis() > timer) { // As long as the arduino started working, read the sensor and convert it to voltage and tempC
+
+    // convert the analog reading (0 to 1023) to voltage (0 - 5V)
+    sensor = analogRead(TMPSENSOR);
+    voltage = sensor * (5.0 / 1023.0);
+    Serial.print("/ Voltage: ");
+    Serial.print(voltage);
+    Serial.print("V / ");
+
+    // convert voltage to degree Celsius including the 500mV offset adjustment
+    temperatureC = (voltage - 0.5) * 100; /* From the TMP36 datasheet, the temperature sensor has a scale factor of 10 mV/°C
+                                            with an offset of 500mV to account for negative temperatures.*/
+    Serial.print(temperatureC);
+    Serial.print(" degrees C");
+  }
+
+  if (temperatureC < Threshold) { // When Temp is not above the threshold
+    GREEN();
+    Serial.println("/ Temperature has not exceeded the limit");
+
+    if (digitalRead(SWITCH) == LOW) { // FARMER NOT AROUND
+      Serial.print("Automatic");
+      digitalWrite(RELAY, HIGH); // DC MOTOR = OFF
+    } else { // FARMER AROUND
+      Serial.print("Manual");
+      if (digitalRead(PB) == LOW) { // PUSH BUTTON = CLOSED
+        digitalWrite(LED, LOW); // RED LED = ON, since the fan should not be working as the temperature is not too high
+        Serial.print("/ Pushbutton is CLOSED and ORANGE LED ON");
+      } else {
+        digitalWrite(LED, HIGH); // TURN OFF the RED LED since the switch is not being activated and no warning should be given to the worker
+        Serial.print("/ Pushbutton is OPEN"); // PUSH BUTTON = OPEN, Farmer did not activate the DC Motor Fan
+      }
+    }
+  } else { // When Temp. exceeded the threshold
+    Serial.println("/ Temperature is too high");
+
+    if (digitalRead(SWITCH) == LOW) { // FARMER NOT AROUND
+      Serial.print("Automatic");
+      digitalWrite(RELAY, LOW); // DC MOTOR = ON
+      RED(); // RED LED = ON
+    } else { // FARMER AROUND
+      Serial.print("Manual");
+      if (digitalRead(PB) == HIGH) { // Switch = OPEN
+        digitalWrite(RELAY, HIGH); // DC MOTOR = OFF
+        Serial.print("/ Pushbutton is OPEN");
+        RED(); // RED LED = ON
+      } else { // SWITCH = CLOSED
+        digitalWrite(RELAY, LOW); // DC MOTOR = ON
+        Serial.print("/ Pushbutton is CLOSED and MOTOR ON");
+        BLUE(); // BLUE LED = ON
+      }
+    }
+  }
+}
+
+void GREEN() {
+  digitalWrite(BLUELED, LOW);
+  digitalWrite(REDLED, LOW);
+  digitalWrite(GREENLED, HIGH);
+}
+
+void RED() {
+  digitalWrite(BLUELED, LOW);
+  digitalWrite(GREENLED, LOW);
+  digitalWrite(REDLED, HIGH);
+}
+
+void BLUE() {
+  digitalWrite(REDLED, LOW);
+  digitalWrite(GREENLED, LOW);
+  digitalWrite(BLUELED, HIGH);
+}
